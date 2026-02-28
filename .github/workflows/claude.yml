@@ -9,17 +9,11 @@ on:
     types: [opened, assigned]
   pull_request_review:
     types: [submitted]
-  pull_request_target:
-      types: [opened, synchronize]
-      branches: [main]
 
 jobs:
-  claude:
+  claude-review:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude review')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,15 +27,15 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Run Claude Code
-        id: claude
+      - name: Run Claude Code Review
+        id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # Prompt A workaround for claude code action bug of `Fork` PR
           prompt: |
               REPO: ${{ github.repository }}
-              PR NUMBER: ${{ github.event.pull_request.number }}
+              PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
 
               Please review this pull request.
 
@@ -55,13 +49,9 @@ jobs:
               - Code quality, style, and best practices
               - Potential bugs, issues, incorrect logic
               - Security implications
-              - CLAUDE.md compliance
+              - .claude/CLAUDE.md compliance
 
               For every issue, rate how significant it is. Make sure you are confident in your diagnosis.
-
-              For every CLAUDE.md compliance violation, check if repo has other places where this issue appears.
-              If it does, do not point out the violation in the place it appears.
-              Instead in the final top-level comment, include a suggestion how to improve CLAUDE.md.
 
               Provide detailed feedback as PR comments, using inline comments for specific issues.
               Use `gh pr comment ${{ github.event.pull_request.number }} --body "..."` for top-level summary. Keep it short.
@@ -90,6 +80,45 @@ jobs:
           # Enable access to other GH Actions outputs
           additional_permissions: |
               actions: read
+
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude') && !contains(github.event.comment.body, '@claude review')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+              --max-turns 50
+              --model claude-opus-4-6
+
+          # Run even when triggered by 3rd party developer's PR
+          allowed_non_write_users: "*"
+
+          # This requires "tag mode", which is currently bugged:
+          # https://github.com/anthropics/claude-code-action/issues/939
+          track_progress: false
+
+          # Enable access to other GH Actions outputs
+          additional_permissions: |
+              actions: read
           # plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           # plugins: 'code-review@claude-code-plugins'
           # prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
@@ -97,11 +126,4 @@ jobs:
           # or https://code.claude.com/docs/en/cli-reference for available options
 
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
 
