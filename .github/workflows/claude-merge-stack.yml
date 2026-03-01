@@ -1,0 +1,107 @@
+name: Claude Code Merge Stack
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  merge-stack:
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@claude merge')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install ghstack
+        run: pip install ghstack
+
+      - name: Run Claude Code for Stack Merge
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.issue.number }}
+            COMMENT: ${{ github.event.comment.body }}
+            AUTHOR: ${{ github.event.comment.user.login }}
+
+            The user has requested to merge a ghstack-based stacked PR by commenting "@claude merge".
+
+            IMPORTANT: Ghstack PRs are NOT merged using standard GitHub merge. Instead, commits are cherry-picked to the main branch and PRs are closed manually.
+
+            Your task:
+            1. Use `gh pr view ${{ github.event.issue.number }} --json title,body,headRefName,baseRefName,state,mergeable,mergeStateStatus` to get PR details
+
+            2. Check if this is a ghstack PR by examining:
+               - The head branch name (should match pattern gh/*/head)
+               - The PR body for "Stack from ghstack"
+
+            3. If this is a ghstack stack:
+               - Parse the PR body to find all PRs in the stack (listed bottom-to-top)
+               - Identify the corresponding gh/*/orig branch which contains the actual commits
+               - Verify all PRs in the stack are in a mergeable state
+
+            4. Merge process (following PyTorch's approach):
+               a. Configure git:
+                  ```
+                  git config user.email "claude-bot@users.noreply.github.com"
+                  git config user.name "Claude Bot"
+                  ```
+
+               b. Fetch and checkout main branch:
+                  ```
+                  git fetch origin main:main
+                  git checkout main
+                  ```
+
+               c. For each commit in the stack (get from gh/*/orig branches):
+                  - Cherry-pick the commit: `git cherry-pick <commit-sha>`
+                  - Amend commit message to include PR reference and co-authors if needed
+
+               d. Push to main:
+                  ```
+                  git push origin main
+                  ```
+
+               e. Close all PRs in the stack:
+                  - For each PR: `gh pr close <number> --comment "Merged via cherry-pick to main in <commit-sha>"`
+
+               f. Delete all gh/* branches for this stack:
+                  - List: `git ls-remote --heads origin | grep "gh/.*/(head|base|orig)"`
+                  - Delete each: `git push origin --delete <branch-name>`
+
+            5. Post a summary comment on the original PR with:
+               - List of commits cherry-picked
+               - List of PRs closed
+               - List of branches deleted
+               - Link to the commits on main
+
+            Important notes:
+            - DO NOT use `gh pr merge` - this will not work correctly for ghstack PRs
+            - Commits must be cherry-picked, not merged
+            - All PRs in the stack should be closed after the commits are pushed to main
+            - Clean up ALL gh/* branches associated with this stack (head, base, and orig)
+            - If any step fails, stop and report the issue without closing PRs or deleting branches
+
+          claude_args: |
+            --max-turns 30
+            --model claude-opus-4-6
+
+          allowed_non_write_users: "*"
+          track_progress: false
