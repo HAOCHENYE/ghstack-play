@@ -43,65 +43,68 @@ jobs:
 
             The user has requested to merge a ghstack-based stacked PR by commenting "@claude merge".
 
-            IMPORTANT: Ghstack PRs are NOT merged using standard GitHub merge. Instead, commits are cherry-picked to the main branch and PRs are closed manually.
+            IMPORTANT: Ghstack PRs structure:
+            - Each PR has THREE branches: gh/*/head, gh/*/base, and gh/*/orig
+            - ONLY gh/*/orig contains the single commit for that PR
+            - gh/*/head contains the accumulated commits from the entire stack
+            - You must cherry-pick from gh/*/orig branches, NOT from gh/*/head
 
             Your task:
-            1. Use `gh pr view ${{ github.event.issue.number }} --json title,body,headRefName,baseRefName,state,mergeable,mergeStateStatus` to get PR details
-
-            2. Check if this is a ghstack PR by examining:
-               - The head branch name (should match pattern gh/*/head)
-               - The PR body for "Stack from ghstack"
-
-            3. If this is a ghstack stack:
+            1. **Gather context from the stacked PRs**:
+               - Use `gh pr view ${{ github.event.issue.number }} --json title,body,headRefName,baseRefName,state,mergeable,mergeStateStatus,number` to get the top PR details
+               - Check if this is a ghstack PR by examining:
+                 * The head branch name (should match pattern gh/*/head)
+                 * The PR body for "Stack from ghstack"
                - Parse the PR body to find all PRs in the stack (listed bottom-to-top)
-               - Identify the corresponding gh/*/orig branch which contains the actual commits
-               - Verify all PRs in the stack are in a mergeable state
+               - For each PR in the stack:
+                 * Use `gh pr view <number> --json title,body,headRefName`
+                 * Extract the stack identifier from headRefName (e.g., gh/username/123/head -> username/123)
+                 * The corresponding orig branch is: gh/username/123/orig
+                 * Verify the PR is in a mergeable state
 
-            4. Merge process (following PyTorch's approach):
-               a. Configure git:
-                  ```
-                  git config user.email "claude-bot@users.noreply.github.com"
-                  git config user.name "Claude Bot"
-                  ```
+            2. **Create a new branch from main**:
+               ```
+               git config user.email "claude-bot@users.noreply.github.com"
+               git config user.name "Claude Bot"
+               git fetch origin main
+               git checkout -b merge-stack-$(date +%s) origin/main
+               ```
 
-               b. Fetch and checkout main branch:
-                  ```
-                  git fetch origin main:main
-                  git checkout main
-                  ```
+            3. **Cherry-pick commits from gh/*/orig branches**:
+               - For each PR in the stack (from bottom to top):
+                 * Fetch the orig branch: `git fetch origin gh/<identifier>/orig`
+                 * Get the commit SHA from orig: `git rev-parse FETCH_HEAD`
+                 * Cherry-pick the single commit: `git cherry-pick <commit-sha>`
+                 * If conflicts occur, report the issue and stop
+               - Important: Each gh/*/orig branch contains exactly ONE commit for that PR
 
-               c. For each commit in the stack (get from gh/*/orig branches):
-                  - Cherry-pick the commit: `git cherry-pick <commit-sha>`
-                  - Amend commit message to include PR reference and co-authors if needed
+            4. **Push the new branch**:
+               ```
+               git push origin merge-stack-<timestamp>
+               ```
 
-               d. Push to main:
-                  ```
-                  git push origin main
-                  ```
+            5. **Provide a create-PR link**:
+               - Post a comment on PR ${{ github.event.issue.number }} with:
+                 * Summary: "I've created a merge branch with cherry-picked commits from this stack"
+                 * List each PR and its commit that was cherry-picked (from gh/*/orig)
+                 * Create PR link: `https://github.com/${{ github.repository }}/compare/main...merge-stack-<timestamp>?expand=1`
+                 * Note: "After this PR is merged, I'll close the original stacked PRs and delete their gh/* branches"
 
-               e. Close all PRs in the stack:
-                  - For each PR: `gh pr close <number> --comment "Merged via cherry-pick to main in <commit-sha>"`
-
-               f. Delete all gh/* branches for this stack:
-                  - List: `git ls-remote --heads origin | grep "gh/.*/(head|base|orig)"`
-                  - Delete each: `git push origin --delete <branch-name>`
-
-            5. Post a summary comment on the original PR with:
-               - List of commits cherry-picked
-               - List of PRs closed
-               - List of branches deleted
-               - Link to the commits on main
+            6. **Future cleanup** (for after manual merge of the new PR):
+               - This can be done in a follow-up or manually
+               - Close all PRs in the stack
+               - Delete all gh/* branches (head, base, orig for each PR)
 
             Important notes:
-            - DO NOT use `gh pr merge` - this will not work correctly for ghstack PRs
-            - Commits must be cherry-picked, not merged
-            - All PRs in the stack should be closed after the commits are pushed to main
-            - Clean up ALL gh/* branches associated with this stack (head, base, and orig)
-            - If any step fails, stop and report the issue without closing PRs or deleting branches
+            - DO NOT cherry-pick from gh/*/head - it contains accumulated commits
+            - ONLY cherry-pick from gh/*/orig - it contains the single commit per PR
+            - DO NOT push directly to main - create an intermediate branch for review
+            - If any step fails, stop and report without making changes
 
           claude_args: |
             --max-turns 30
             --model claude-opus-4-6
+            --allowedTools "Bash(git:*),Bash(gh:*),Read,Grep,Glob"
 
           allowed_non_write_users: "*"
           track_progress: false
