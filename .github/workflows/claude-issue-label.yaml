@@ -38,5 +38,5 @@ jobs:
             If it appears to be a duplicate, post a comment mentioning the original issue.
 
           claude_args: |
-            --allowedTools "Bash(./.github/gh.sh:*)"
+            --allowedTools "Bash(./.github/gh.sh:*),Bash(./.github/edit-issue-labels.sh:*)"
 
