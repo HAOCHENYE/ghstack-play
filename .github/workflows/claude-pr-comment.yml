@@ -73,8 +73,8 @@ jobs:
               REPO: ${{ github.repository }}
               PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
 
-              COMMENT_USER: ${{${{ github.event.comment.user.login }}}}
-              COMMENT_CONTENT: ${{${{ github.event.comment.body }}}}
+              COMMENT_USER: ${{ github.event.comment.user.login }}
+              COMMENT_CONTENT: ${{ github.event.comment.body }}
 
               Please anser the user's question. If you need to get the PR content, use can
               use `gh pr view <PR NUMBER> --comments` and `gh pr diff <PR NUMBER> --patch` to access the PR content.
