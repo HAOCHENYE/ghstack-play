@@ -48,7 +48,7 @@ jobs:
 
   claude-comment:
     if: |
-      contains(github.event.comment.body, 'claude') &&
+      contains(github.event.comment.body, '@claude') &&
       !contains(github.event.comment.body, '@claude review')
     runs-on: ubuntu-latest
     permissions:
