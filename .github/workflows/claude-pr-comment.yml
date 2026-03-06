@@ -110,14 +110,13 @@ jobs:
               description.
 
               Use `gh pr comment ${{ github.event.pull_request.number }} --body "..."` to summarize the result.
+              **Never, Never** use `gh` with `GH_TOKEN gh ...` !
 
               If a user requests PR modifications, push the changes to the forked repository for fork PRs:
 
               ```console
               git push https://x-access-token:${{ steps.pr.outputs.token }}@github.com/<fork-repo-path>.git HEAD:<fork-branch>
               ```
-
-              Use Personal Access Tokens (PAT) exclusively for standard git commands. For GitHub CLI (gh) operations, use the tool directly without specifying a `GH_TOKEN` environment variable.
 
               otherwise, push directly to the origin repository.
           claude_args: |
