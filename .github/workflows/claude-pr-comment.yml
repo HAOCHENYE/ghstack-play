@@ -111,8 +111,13 @@ jobs:
 
               Use `gh pr comment ${{ github.event.pull_request.number }} --body "..."` to summarize the result.
 
-              If a user requests PR modifications, push the changes to the forked repository for fork PRs; otherwise, push directly to the origin repository.
+              If a user requests PR modifications, push the changes to the forked repository for fork PRs:
 
+              ```console
+              git push https://x-access-token:${{ steps.pr.outputs.token }}@github.com/<fork-repo-path>.git HEAD:<fork-branch>
+              ```
+
+              otherwise, push directly to the origin repository.
           claude_args: |
               --max-turns 30
               --model claude-opus-4-6
