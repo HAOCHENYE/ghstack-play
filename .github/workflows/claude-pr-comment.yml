@@ -95,7 +95,6 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ steps.pr.outputs.token }}
           show_full_output: true
           prompt: |
               REPO: ${{ github.repository }}
@@ -108,9 +107,6 @@ jobs:
               use `gh pr view <PR NUMBER> --comments` and `gh pr diff <PR NUMBER> --patch` to access the PR content.
               You can use multiple subagents to parallelize tasks. Each subagent should be told the PR title and
               description.
-
-              Use `gh pr comment ${{ github.event.pull_request.number }} --body "..."` to summarize the result.
-              **Never, Never** use `gh` with `GH_TOKEN gh ...` !
 
               If a user requests PR modifications, push the changes to the forked repository for fork PRs:
 
