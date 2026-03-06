@@ -19,6 +19,47 @@ jobs:
       id-token: write
       actions: read
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          prompt: /review
+          claude_args: |
+              --max-turns 30
+              --model claude-opus-4-6
+              --allowedTools "
+                Read,Write,Edit,MultiEdit,LS,Grep,Glob,
+                Bash(cat:*),Bash(test:*),Bash(printf:*),Bash(jq:*),Bash(head:*),Bash(git:*),Bash(gh:*),
+                mcp__github_inline_comment__create_inline_comment,
+                "
+          settings: |
+            {
+              "env": {
+                "DEBUG": "true"
+              }
+            }
+          allowed_non_write_users: "*"
+          track_progress: false
+
+  claude-comment:
+    if: |
+      contains(github.event.comment.body, '@claude') &&
+      !contains(github.event.comment.body, '@claude review')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
       - name: Get PR info and select PAT
         id: pr
         uses: actions/github-script@v7
@@ -54,49 +95,8 @@ jobs:
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ steps.pr.outputs.token }}
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          show_full_output: true
-          prompt: /review
-          claude_args: |
-              --max-turns 30
-              --model claude-opus-4-6
-              --allowedTools "
-                Read,Write,Edit,MultiEdit,LS,Grep,Glob,
-                Bash(cat:*),Bash(test:*),Bash(printf:*),Bash(jq:*),Bash(head:*),Bash(git:*),Bash(gh:*),
-                mcp__github_inline_comment__create_inline_comment,
-                "
-          settings: |
-            {
-              "env": {
-                "DEBUG": "true"
-              }
-            }
-          allowed_non_write_users: "*"
-          track_progress: false
-
-  claude-comment:
-    if: |
-      contains(github.event.comment.body, '@claude') &&
-      !contains(github.event.comment.body, '@claude review')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      id-token: write
-      actions: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Run Claude Code Review
-        id: claude-review
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           show_full_output: true
           prompt: |
               REPO: ${{ github.repository }}
