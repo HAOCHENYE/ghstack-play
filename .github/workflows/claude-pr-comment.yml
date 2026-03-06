@@ -2,8 +2,7 @@ name: Claude Code
 
 on:
   pull_request_review_comment:
-    types: [created]
-    types: [opened, assigned]
+    types: [created, opened, assigned]
   pull_request_review:
     types: [submitted]
 
