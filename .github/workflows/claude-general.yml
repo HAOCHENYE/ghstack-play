@@ -18,7 +18,7 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
-      actions: write
+      actions: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,7 +31,6 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           show_full_output: true
-          allowed_bots: '*'
           prompt: |
               REPO: ${{ github.repository }}
               PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
