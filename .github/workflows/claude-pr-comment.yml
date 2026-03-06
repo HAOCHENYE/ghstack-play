@@ -83,6 +83,8 @@ jobs:
               You can use multiple subagents to parallelize tasks. Each subagent should be told the PR title and
               description.
 
+              Use `gh pr comment ${{ github.event.pull_request.number }} --body "..."` to summarize the result.
+
           claude_args: |
               --max-turns 30
               --model claude-opus-4-6
