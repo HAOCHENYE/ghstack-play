@@ -19,6 +19,32 @@ jobs:
       id-token: write
       actions: read
     steps:
+      - name: Get PR info and select PAT
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const author = pr.data.user.login;
+            const pats = JSON.parse(process.env.CONTRIBUTOR_PATS);
+            const token = pats[author];
+
+            if (!token) {
+              core.setFailed(`No PAT found for user: ${author}`);
+              return;
+            }
+
+            core.setSecret(token);
+            core.setOutput('token', token);
+            core.setOutput('head_ref', pr.data.head.ref);
+            core.setOutput('head_repo', pr.data.head.repo.full_name);
+        env:
+          CONTRIBUTOR_PATS: ${{ secrets.CONTRIBUTOR_PATS }}
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -28,6 +54,7 @@ jobs:
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
+          github_token: ${{ steps.pr.outputs.token }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           show_full_output: true
           prompt: /review
