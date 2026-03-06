@@ -90,7 +90,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
+      - name: Configure git credential
+        run: |
+          echo "https://x-access-token:${{ steps.pr.outputs.token }}@github.com" > ~/.git-credentials
+          git config --global credential.helper store
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
